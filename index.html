@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f5f0">
+  <meta name="description" content="一个安静记录上班、坐着、站着和摸鱼时间的小工具。">
+  <title>workish — 今天坐了多久</title>
+  <style>
+    :root{--paper:#f7f5f0;--ink:#151513;--muted:#858179;--line:#d8d3ca;--accent:#ff4b2e}
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink)}
+    body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+    button,input,select{font:inherit}button{color:inherit}.app{position:relative;min-height:100vh;overflow:hidden;background:radial-gradient(circle at 50% 42%,rgba(255,255,255,.78),transparent 46%),var(--paper)}
+    .topbar{position:absolute;z-index:5;inset:0 0 auto;display:flex;justify-content:space-between;align-items:center;padding:29px 31px}.brand{font-size:22px;font-weight:550;letter-spacing:-.7px}
+    .text-button{appearance:none;border:0;border-bottom:2px solid currentColor;background:transparent;padding:0 1px 7px;cursor:pointer;transition:color .2s,transform .2s}.text-button:hover{color:var(--accent)}.text-button:active{transform:translateY(1px)}
+    button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:4px}.top-record,.clock-out{font-size:20px}
+    .stage{position:absolute;inset:50% auto auto 50%;width:min(760px,calc(100vw - 48px));transform:translate(-50%,-60%);text-align:center}.state{display:flex;align-items:center;justify-content:center;gap:30px;margin-bottom:52px;font-size:clamp(28px,2.35vw,38px);font-weight:450;letter-spacing:-.8px}.state.muted{color:var(--muted);gap:0}
+    .dot{width:16px;height:16px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 6px rgba(255,75,46,.05)}.dot.stopped{background:#a19d95;box-shadow:none}
+    .timer{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:clamp(72px,8.5vw,124px);font-weight:400;line-height:.95;letter-spacing:-7px;font-variant-numeric:tabular-nums;white-space:nowrap}.idle{color:#d8d3ca}
+    .controls{display:flex;justify-content:center;gap:176px;margin-top:93px}.control,.start,.adjust{font-size:26px;letter-spacing:-.5px}.control.active{color:var(--accent)}.start,.adjust{margin-top:90px}.clock-out{position:absolute;right:41px;bottom:42px}
+    .backdrop{position:fixed;z-index:20;inset:0;background:rgba(34,31,27,.14);opacity:0;pointer-events:none;transition:opacity .35s}.backdrop.show{opacity:1;pointer-events:auto}
+    .drawer{position:fixed;z-index:25;top:0;right:0;width:min(448px,100vw);height:100vh;padding:31px 34px 28px;overflow-y:auto;background:#fbfaf7;border-left:1px solid rgba(21,21,19,.12);box-shadow:-24px 0 80px rgba(45,41,36,.08);transform:translateX(101%);transition:transform .42s cubic-bezier(.22,1,.36,1)}.drawer.open{transform:translateX(0)}
+    .drawer-head{display:flex;align-items:flex-start;justify-content:space-between}.kicker,.section-label{color:var(--muted);font-size:12px;letter-spacing:.16em}.drawer h1{margin:7px 0 0;font-size:32px;font-weight:520;letter-spacing:-1.2px}.close,.cancel{border:0;border-bottom:1px solid currentColor;padding:0 0 4px;background:none;color:var(--muted);cursor:pointer;font-size:14px}
+    .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;padding:52px 0 27px;border-bottom:1px solid var(--line)}.summary span{display:block;margin-bottom:10px;color:var(--muted);font-size:13px}.summary strong{display:block;font-size:19px;font-weight:510;line-height:1.25}.break-note{padding-top:14px;color:var(--muted);font-size:13px}
+    .drawer-actions{display:grid;grid-template-columns:1.2fr 1fr;gap:9px;margin:32px 0 38px}.primary,.secondary,.save{min-height:45px;border:1px solid var(--ink);border-radius:0;background:var(--ink);color:var(--paper);cursor:pointer;font-size:14px}.secondary{background:transparent;color:var(--ink)}.primary:hover,.save:hover{background:var(--accent);border-color:var(--accent)}.secondary:hover{border-color:var(--accent);color:var(--accent)}
+    .history{margin-top:10px}.history-row{display:grid;grid-template-columns:1fr auto;width:100%;padding:16px 0;border:0;border-top:1px solid var(--line);background:transparent;cursor:pointer;text-align:left}.history-row span:last-child{color:var(--muted);font-size:13px}.history-row:hover span:first-child,.history-row.selected span:first-child{color:var(--accent)}.empty{padding:20px 0;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+    .manual-list{margin-bottom:36px}.manual-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-top:1px solid var(--line)}.manual-row strong{display:block;font-size:14px;font-weight:520}.manual-row span{display:block;margin-top:4px;color:var(--muted);font-size:12px}.manual-row button,.backup button{border:0;background:none;color:var(--muted);cursor:pointer;font-size:12px}.manual-row button:hover,.backup button:hover{color:var(--accent)}.backup{display:flex;gap:18px;padding-top:30px}.backup button{padding:0 0 3px;border-bottom:1px solid currentColor}
+    dialog{width:min(520px,calc(100% - 48px));max-height:calc(100vh - 48px);padding:38px 40px 40px;border:1px solid rgba(21,21,19,.14);border-radius:0;background:#fbfaf7;color:var(--ink);box-shadow:0 30px 100px rgba(35,31,27,.16)}dialog::backdrop{background:rgba(25,23,20,.2);backdrop-filter:blur(8px)}dialog h2{margin:0 0 8px;font-size:28px;font-weight:520;letter-spacing:-.8px}dialog>p{margin:0 0 32px;color:var(--muted);font-size:14px}.dialog-head{display:flex;justify-content:space-between;align-items:flex-start}.dialog-head .cancel{margin-left:20px}
+    dialog label{position:relative;display:block;margin:18px 0;color:var(--muted);font-size:12px}dialog input:not([type=checkbox]),dialog select{display:block;width:100%;margin-top:7px;padding:10px 0;border:0;border-bottom:1px solid var(--ink);border-radius:0;background:transparent;color:var(--ink);font-size:17px;outline:none}.triple{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}.double{display:grid;grid-template-columns:repeat(2,1fr);gap:0 28px}dialog small{position:absolute;right:0;bottom:13px;color:var(--muted)}dialog .check{display:flex;align-items:center;gap:9px;color:var(--ink);font-size:14px}.check input{accent-color:var(--accent)}.save{width:100%;margin-top:18px}
+    .toast{position:fixed;z-index:60;left:50%;bottom:36px;transform:translateX(-50%);padding:11px 18px;background:var(--ink);color:var(--paper);font-size:13px;box-shadow:0 10px 40px rgba(0,0,0,.14)}[hidden]{display:none!important}
+    @media(max-width:700px){.topbar{padding:22px 20px}.brand{font-size:19px}.top-record,.clock-out{font-size:17px}.stage{transform:translate(-50%,-52%)}.state{gap:16px;margin-bottom:38px;font-size:24px}.dot{width:12px;height:12px}.timer{font-size:clamp(50px,18vw,76px);letter-spacing:-4px}.controls{gap:62px;margin-top:68px}.control,.start,.adjust{font-size:21px}.clock-out{right:22px;bottom:25px}.drawer{padding:25px 22px}.drawer-actions{grid-template-columns:1fr}dialog{padding:34px 24px 28px}.triple{gap:13px}}
+    @media(prefers-reduced-motion:reduce){*,*:before,*:after{transition-duration:.01ms!important}}
+  </style>
+</head>
+<body>
+<main class="app">
+  <header class="topbar"><div class="brand">workish</div><button id="recordsBtn" class="text-button top-record">记录</button></header>
+  <section class="stage" aria-live="polite">
+    <div id="state" class="state muted">今天还没开始</div>
+    <div id="timer" class="timer idle">00:00:00</div>
+    <div id="controls" class="controls" hidden><button id="postureBtn" class="text-button control">站起来</button><button id="activityBtn" class="text-button control">摸会鱼</button></div>
+    <button id="startBtn" class="text-button start">开始上班</button>
+    <button id="adjustBtn" class="text-button adjust" hidden>调整今天</button>
+  </section>
+  <button id="endBtn" class="text-button clock-out" hidden>下班</button>
+
+  <div id="backdrop" class="backdrop"></div>
+  <aside id="drawer" class="drawer" aria-hidden="true">
+    <div class="drawer-head"><div><div class="kicker">记录</div><h1 id="drawerDate">今天</h1></div><button id="closeDrawer" class="close">关闭</button></div>
+    <div class="summary"><div><span>坐着</span><strong id="sumSit">0 分钟</strong></div><div><span>站着</span><strong id="sumStand">0 分钟</strong></div><div><span>上班</span><strong id="sumWork">0 分钟</strong></div></div>
+    <div id="sumBreak" class="break-note">其中摸鱼 0 分钟</div>
+    <div class="drawer-actions"><button id="addEntry" class="primary">添加一段时间</button><button id="editTotals" class="secondary">调整当天总计</button></div>
+    <div id="manualSection" class="manual-list" hidden><div class="section-label">补充记录</div><div id="manualRows"></div></div>
+    <div class="history"><div class="section-label">过去</div><div id="historyRows"></div></div>
+    <div class="backup"><button id="exportBtn">导出备份</button><button id="importBtn">导入恢复</button><input id="importFile" type="file" accept="application/json" hidden></div>
+  </aside>
+
+  <dialog id="entryDialog">
+    <div class="dialog-head"><div><h2>添加一段时间</h2><p>开会和通勤不用计时，之后补进来就好。</p></div><button class="cancel" data-close="entryDialog">取消</button></div>
+    <label>哪一天<input id="entryDate" type="date"></label>
+    <label>做了什么<select id="entryType"><option value="meeting">开会</option><option value="commute">通勤</option><option value="meal">吃饭</option><option value="bathroom">上卫生间</option><option value="other">其他</option></select></label>
+    <div class="triple"><label>总共<input id="entryDuration" type="number" min="0" value="30"><small>分钟</small></label><label>坐着<input id="entrySitting" type="number" min="0" value="30"><small>分钟</small></label><label>站着<input id="entryStanding" type="number" min="0" value="0"><small>分钟</small></label></div>
+    <label class="check"><input id="entryWork" type="checkbox" checked>算进上班时间</label>
+    <label>备注，可不填<input id="entryNote" type="text" placeholder="比如：周会"></label>
+    <button id="saveEntry" class="save">加上</button>
+  </dialog>
+
+  <dialog id="totalsDialog">
+    <div class="dialog-head"><div><h2>调整当天总计</h2><p>哪次忘了点，直接把最后的数字改对就行。</p></div><button class="cancel" data-close="totalsDialog">取消</button></div>
+    <div class="double"><label>上班<input id="totalWork" type="number" min="0"><small>分钟</small></label><label>坐着<input id="totalSitting" type="number" min="0"><small>分钟</small></label><label>站着<input id="totalStanding" type="number" min="0"><small>分钟</small></label><label>摸鱼<input id="totalBreak" type="number" min="0"><small>分钟</small></label></div>
+    <button id="saveTotals" class="save">就这样</button>
+  </dialog>
+  <div id="toast" class="toast" hidden></div>
+</main>
+
+<script>
+  (()=>{
+    const KEY='workish:v1';
+    const typeNames={meeting:'开会',commute:'通勤',meal:'吃饭',bathroom:'上卫生间',other:'其他'};
+    let data={version:1,days:{}};let selected=dateKey();let now=new Date();let toastTimer;
+    try{const saved=localStorage.getItem(KEY);if(saved)data=JSON.parse(saved);navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+    const $=id=>document.getElementById(id);
+    function dateKey(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
+    function blank(date){return{date,workStart:null,workEnd:null,postureEvents:[],activityEvents:[],manualEntries:[]}}
+    function day(date){return data.days[date]}
+    function update(date,fn){data.days[date]=fn(data.days[date]||blank(date));persist();render()}
+    function persist(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){toast('浏览器没有允许储存')}}
+    function eventMinutes(start,end,events,wanted){const endMs=new Date(end).getTime();let total=0;events.forEach((e,i)=>{if(e.mode!==wanted)return;const from=Math.max(new Date(start).getTime(),new Date(e.at).getTime());const to=Math.min(endMs,i+1<events.length?new Date(events[i+1].at).getTime():endMs);if(to>from)total+=(to-from)/60000});return Math.max(0,Math.round(total))}
+    function summary(d){if(!d)return{work:0,sitting:0,standing:0,break:0};const end=d.workEnd||now.toISOString();const autoWork=d.workStart?Math.max(0,Math.round((new Date(end)-new Date(d.workStart))/60000)):0;const autoStand=d.workStart?eventMinutes(d.workStart,end,d.postureEvents,'stand'):0;const autoBreak=d.workStart?eventMinutes(d.workStart,end,d.activityEvents,'break'):0;const manualWork=d.manualEntries.reduce((s,e)=>s+(e.includeInWork?e.duration:0),0);const manualSit=d.manualEntries.reduce((s,e)=>s+e.sitting,0);const manualStand=d.manualEntries.reduce((s,e)=>s+e.standing,0);return d.overrides||{work:autoWork+manualWork,standing:autoStand+manualStand,sitting:Math.max(0,autoWork-autoStand)+manualSit,break:autoBreak}}
+    function clock(seconds){const s=Math.max(0,Math.floor(seconds));return `${String(Math.floor(s/3600)).padStart(2,'0')}:${String(Math.floor((s%3600)/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`}
+    function mins(n){const h=Math.floor(n/60),r=Math.max(0,Math.round(n%60));return h?(r?`${h} 小时 ${r} 分`:`${h} 小时`):`${r} 分钟`}
+    function label(date){if(date===dateKey())return'今天';const y=new Date();y.setDate(y.getDate()-1);if(date===dateKey(y))return'昨天';const d=new Date(date+'T12:00:00');return `${d.getMonth()+1} 月 ${d.getDate()} 日`}
+    function toast(message){$('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,2300)}
+    function render(){now=new Date();const key=dateKey(now),d=day(key),running=!!(d&&d.workStart&&!d.workEnd),posture=d&&d.postureEvents.length?d.postureEvents[d.postureEvents.length-1].mode:'sit',activity=d&&d.activityEvents.length?d.activityEvents[d.activityEvents.length-1].mode:'work';
+      if(d&&d.workStart){const state=running?(activity==='break'?(posture==='stand'?'站着摸鱼':'坐着摸鱼'):(posture==='stand'?'站着工作':'坐着工作')):'今日已下班';$('state').className='state';$('state').innerHTML=`<span class="dot${running?'':' stopped'}"></span>${state}`;$('timer').classList.remove('idle');$('timer').textContent=clock(((d.workEnd?new Date(d.workEnd):now)-new Date(d.workStart))/1000);$('controls').hidden=!running;$('startBtn').hidden=true;$('adjustBtn').hidden=running;$('endBtn').hidden=!running;$('postureBtn').textContent=posture==='stand'?'坐下来':'站起来';$('postureBtn').classList.toggle('active',posture==='stand');$('activityBtn').textContent=activity==='break'?'继续干活':'摸会鱼';$('activityBtn').classList.toggle('active',activity==='break')
+      }else{$('state').className='state muted';$('state').textContent='今天还没开始';$('timer').classList.add('idle');$('timer').textContent='00:00:00';$('controls').hidden=true;$('startBtn').hidden=false;$('adjustBtn').hidden=true;$('endBtn').hidden=true}
+      renderDrawer()
+    }
+    function renderDrawer(){const d=day(selected),s=summary(d);$('drawerDate').textContent=label(selected);$('sumSit').textContent=mins(s.sitting);$('sumStand').textContent=mins(s.standing);$('sumWork').textContent=mins(s.work);$('sumBreak').textContent=`其中摸鱼 ${mins(s.break)}`;
+      const entries=d?d.manualEntries:[];$('manualSection').hidden=!entries.length;$('manualRows').innerHTML=entries.map(e=>`<div class="manual-row"><div><strong>${typeNames[e.type]}</strong><span>${e.duration} 分钟 · 坐 ${e.sitting} / 站 ${e.standing}</span></div><button data-delete="${e.id}">删除</button></div>`).join('');
+      const dates=Object.keys(data.days).sort((a,b)=>b.localeCompare(a));$('historyRows').innerHTML=dates.length?dates.map(date=>{const item=summary(day(date));return `<button class="history-row${selected===date?' selected':''}" data-date="${date}"><span>${label(date)}</span><span>${mins(item.sitting)} 坐着</span></button>`}).join(''):'<div class="empty">记录会从这里慢慢长出来。</div>'
+    }
+    function openDrawer(){selected=dateKey();$('drawer').classList.add('open');$('backdrop').classList.add('show');$('drawer').setAttribute('aria-hidden','false');renderDrawer()}
+    function closeDrawer(){$('drawer').classList.remove('open');$('backdrop').classList.remove('show');$('drawer').setAttribute('aria-hidden','true')}
+    $('recordsBtn').onclick=openDrawer;$('closeDrawer').onclick=closeDrawer;$('backdrop').onclick=closeDrawer;
+    $('startBtn').onclick=()=>{const at=new Date().toISOString(),key=dateKey();update(key,d=>({...d,workStart:at,workEnd:null,postureEvents:[{at,mode:'sit'}],activityEvents:[{at,mode:'work'}],overrides:undefined}))};
+    $('postureBtn').onclick=()=>{const key=dateKey(),d=day(key),mode=d.postureEvents[d.postureEvents.length-1].mode;update(key,x=>({...x,postureEvents:[...x.postureEvents,{at:new Date().toISOString(),mode:mode==='sit'?'stand':'sit'}]}))};
+    $('activityBtn').onclick=()=>{const key=dateKey(),d=day(key),mode=d.activityEvents[d.activityEvents.length-1].mode;update(key,x=>({...x,activityEvents:[...x.activityEvents,{at:new Date().toISOString(),mode:mode==='work'?'break':'work'}]}))};
+    $('endBtn').onclick=()=>{if(confirm('今天就到这里？计时会停下来。')){const key=dateKey();update(key,d=>({...d,workEnd:new Date().toISOString()}));toast('下班啦')}};
+    $('historyRows').onclick=e=>{const b=e.target.closest('[data-date]');if(b){selected=b.dataset.date;renderDrawer()}};
+    $('manualRows').onclick=e=>{const b=e.target.closest('[data-delete]');if(b)update(selected,d=>({...d,manualEntries:d.manualEntries.filter(x=>x.id!==b.dataset.delete)}))};
+    function showEntry(){$('entryDate').value=selected;$('entryType').value='meeting';$('entryDuration').value=30;$('entrySitting').value=30;$('entryStanding').value=0;$('entryWork').checked=true;$('entryNote').value='';$('entryDialog').showModal()}
+    $('addEntry').onclick=showEntry;$('entryType').onchange=e=>$('entryWork').checked=e.target.value!=='commute';
+    $('saveEntry').onclick=()=>{const duration=Math.max(0,Number($('entryDuration').value)||0),sitting=Math.max(0,Number($('entrySitting').value)||0),standing=Math.max(0,Number($('entryStanding').value)||0);if(!duration||sitting+standing!==duration){toast('坐着 + 站着要刚好等于总时长');return}const date=$('entryDate').value;const entry={id:crypto.randomUUID(),type:$('entryType').value,duration,sitting,standing,includeInWork:$('entryWork').checked,note:$('entryNote').value.trim()};update(date,d=>({...d,manualEntries:[...d.manualEntries,entry]}));selected=date;$('entryDialog').close();toast('记录加上了')};
+    function showTotals(){const s=summary(day(selected));$('totalWork').value=s.work;$('totalSitting').value=s.sitting;$('totalStanding').value=s.standing;$('totalBreak').value=s.break;$('totalsDialog').showModal()}
+    $('editTotals').onclick=showTotals;$('adjustBtn').onclick=()=>{selected=dateKey();showTotals()};$('saveTotals').onclick=()=>{const overrides={work:Math.max(0,Number($('totalWork').value)||0),sitting:Math.max(0,Number($('totalSitting').value)||0),standing:Math.max(0,Number($('totalStanding').value)||0),break:Math.max(0,Number($('totalBreak').value)||0)};update(selected,d=>({...d,overrides}));$('totalsDialog').close();toast('已经改好了')};
+    document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());
+    $('exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`workish-backup-${dateKey()}.json`;a.click();URL.revokeObjectURL(url);toast('备份下载好了')};
+    $('importBtn').onclick=()=>$('importFile').click();$('importFile').onchange=e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const parsed=JSON.parse(reader.result);if(parsed.version!==1||!parsed.days)throw 0;data=parsed;selected=dateKey();persist();render();toast('记录恢复好了')}catch(x){toast('这个备份文件好像不对')}};reader.readAsText(file);e.target.value=''};
+    render();setInterval(render,1000)
+  })();
+</script>
+</body>
+</html>
