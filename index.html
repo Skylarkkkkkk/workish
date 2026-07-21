@@ -73,7 +73,7 @@
   <dialog id="entryDialog">
     <div class="dialog-head"><div><h2>添加一段时间</h2><p>开会和通勤不用计时，之后补进来就好。</p></div><button class="cancel" data-close="entryDialog">取消</button></div>
     <label>哪一天<input id="entryDate" type="date"></label>
-    <label>做了什么<select id="entryType"><option value="meeting">开会</option><option value="commute">通勤</option><option value="meal">吃饭</option><option value="bathroom">上卫生间</option><option value="other">其他</option></select></label>
+    <label>做了什么<select id="entryType"><option value="meeting">开会</option><option value="commute">通勤</option><option value="break">摸鱼</option><option value="meal">吃饭</option><option value="bathroom">上卫生间</option><option value="other">其他</option></select></label>
     <div id="entryTimeRange" class="double"><label>开始时间<input id="entryStartTime" type="time"></label><label>结束时间<input id="entryEndTime" type="time"></label></div>
     <div id="entryCalculated" class="calculated">自动算成 30 分钟</div>
     <label id="entryDurationField" hidden>通勤多久<input id="entryDuration" type="number" min="0" value="30"><small>分钟</small></label>
@@ -96,7 +96,7 @@
 <script>
   (()=>{
     const KEY='workish:v1';
-    const typeNames={meeting:'开会',commute:'通勤',meal:'吃饭',bathroom:'上卫生间',other:'其他'};
+    const typeNames={meeting:'开会',commute:'通勤',break:'摸鱼',meal:'吃饭',bathroom:'上卫生间',other:'其他'};
     let data={version:1,days:{}};let selected=dateKey();let viewMode='day';let periodAnchor=dateKey();let now=new Date();let toastTimer;
     try{const saved=localStorage.getItem(KEY);if(saved)data=JSON.parse(saved);navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
     const $=id=>document.getElementById(id);
@@ -106,16 +106,16 @@
     function update(date,fn){data.days[date]=fn(data.days[date]||blank(date));persist();render()}
     function persist(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){toast('浏览器没有允许储存')}}
     function eventMinutes(start,end,events,wanted){const endMs=new Date(end).getTime();let total=0;events.forEach((e,i)=>{if(e.mode!==wanted)return;const from=Math.max(new Date(start).getTime(),new Date(e.at).getTime());const to=Math.min(endMs,i+1<events.length?new Date(events[i+1].at).getTime():endMs);if(to>from)total+=(to-from)/60000});return Math.max(0,Math.round(total))}
-    function manualImpact(d,entries,end){let work=0,sitting=0,standing=0;const workStartMs=d.workStart?new Date(d.workStart).getTime():NaN,workEndMs=new Date(end).getTime();entries.forEach(e=>{let entryWork=e.includeInWork?e.duration:0,entrySitting=e.sitting,entryStanding=e.standing;if(e.startAt&&e.endAt&&Number.isFinite(workStartMs)){const overlapStart=Math.max(workStartMs,new Date(e.startAt).getTime()),overlapEnd=Math.min(workEndMs,new Date(e.endAt).getTime()),overlap=Math.max(0,Math.round((overlapEnd-overlapStart)/60000));if(overlap>0){const overlappedStanding=eventMinutes(new Date(overlapStart).toISOString(),new Date(overlapEnd).toISOString(),d.postureEvents,'stand');if(e.includeInWork)entryWork=Math.max(0,entryWork-overlap);entrySitting-=Math.max(0,overlap-overlappedStanding);entryStanding-=overlappedStanding}}work+=entryWork;sitting+=entrySitting;standing+=entryStanding});return{work,sitting,standing}}
+    function manualImpact(d,entries,end){let work=0,sitting=0,standing=0,breakTime=0;const workStartMs=d.workStart?new Date(d.workStart).getTime():NaN,workEndMs=new Date(end).getTime();entries.forEach(e=>{let entryWork=e.includeInWork?e.duration:0,entrySitting=e.sitting,entryStanding=e.standing,entryBreak=e.type==='break'?e.duration:0;if(e.startAt&&e.endAt&&Number.isFinite(workStartMs)){const overlapStart=Math.max(workStartMs,new Date(e.startAt).getTime()),overlapEnd=Math.min(workEndMs,new Date(e.endAt).getTime()),overlap=Math.max(0,Math.round((overlapEnd-overlapStart)/60000));if(overlap>0){const overlapStartAt=new Date(overlapStart).toISOString(),overlapEndAt=new Date(overlapEnd).toISOString(),overlappedStanding=eventMinutes(overlapStartAt,overlapEndAt,d.postureEvents,'stand'),overlappedBreak=eventMinutes(overlapStartAt,overlapEndAt,d.activityEvents,'break');if(e.includeInWork)entryWork=Math.max(0,entryWork-overlap);entrySitting-=Math.max(0,overlap-overlappedStanding);entryStanding-=overlappedStanding;entryBreak-=overlappedBreak}}work+=entryWork;sitting+=entrySitting;standing+=entryStanding;breakTime+=Math.max(0,entryBreak)});return{work,sitting,standing,break:breakTime}}
     function summary(d){
       if(!d)return{work:0,sitting:0,standing:0,break:0};
-      const end=d.workEnd||now.toISOString(),entries=d.manualEntries||[],autoWork=d.workStart?Math.max(0,Math.round((new Date(end)-new Date(d.workStart))/60000)):0,autoStand=d.workStart?eventMinutes(d.workStart,end,d.postureEvents,'stand'):0,autoBreak=d.workStart?eventMinutes(d.workStart,end,d.activityEvents,'break'):0,impact=manualImpact(d,entries,end),calculated={work:Math.max(0,autoWork+impact.work),standing:Math.max(0,autoStand+impact.standing),sitting:Math.max(0,autoWork-autoStand+impact.sitting),break:autoBreak};
+      const end=d.workEnd||now.toISOString(),entries=d.manualEntries||[],autoWork=d.workStart?Math.max(0,Math.round((new Date(end)-new Date(d.workStart))/60000)):0,autoStand=d.workStart?eventMinutes(d.workStart,end,d.postureEvents,'stand'):0,autoBreak=d.workStart?eventMinutes(d.workStart,end,d.activityEvents,'break'):0,impact=manualImpact(d,entries,end),calculated={work:Math.max(0,autoWork+impact.work),standing:Math.max(0,autoStand+impact.standing),sitting:Math.max(0,autoWork-autoStand+impact.sitting),break:autoBreak+impact.break};
       if(!d.overrides)return calculated;
       if(!d.overridesAt||!d.workStart)return d.overrides;
       const cutoffMs=new Date(d.overridesAt).getTime(),endMs=new Date(end).getTime();
       if(!Number.isFinite(cutoffMs)||!Number.isFinite(endMs))return d.overrides;
       const manualCutoffMs=d.manualOverridesAt?new Date(d.manualOverridesAt).getTime():cutoffMs,extraAutoWork=endMs>cutoffMs?Math.max(0,Math.round((endMs-cutoffMs)/60000)):0,extraAutoStand=endMs>cutoffMs?eventMinutes(d.overridesAt,end,d.postureEvents,'stand'):0,extraAutoBreak=endMs>cutoffMs?eventMinutes(d.overridesAt,end,d.activityEvents,'break'):0,laterEntries=entries.filter(e=>e.createdAt&&new Date(e.createdAt).getTime()>manualCutoffMs),extraImpact=manualImpact(d,laterEntries,end);
-      return{work:Math.max(0,d.overrides.work+extraAutoWork+extraImpact.work),standing:Math.max(0,d.overrides.standing+extraAutoStand+extraImpact.standing),sitting:Math.max(0,d.overrides.sitting+Math.max(0,extraAutoWork-extraAutoStand)+extraImpact.sitting),break:d.overrides.break+extraAutoBreak}
+      return{work:Math.max(0,d.overrides.work+extraAutoWork+extraImpact.work),standing:Math.max(0,d.overrides.standing+extraAutoStand+extraImpact.standing),sitting:Math.max(0,d.overrides.sitting+Math.max(0,extraAutoWork-extraAutoStand)+extraImpact.sitting),break:d.overrides.break+extraAutoBreak+extraImpact.break}
     }
     function clock(seconds){const s=Math.max(0,Math.floor(seconds));return `${String(Math.floor(s/3600)).padStart(2,'0')}:${String(Math.floor((s%3600)/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`}
     function mins(n){const h=Math.floor(n/60),r=Math.max(0,Math.round(n%60));return h?(r?`${h} 小时 ${r} 分`:`${h} 小时`):`${r} 分钟`}
